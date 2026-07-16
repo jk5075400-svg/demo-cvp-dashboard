@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CVP Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #FAF8F4;
+    --surface: #FFFFFF;
+    --surface-2: #F2F0EA;
+    --border: #E1DFD6;
+    --text-primary: #1B2430;
+    --text-secondary: #5F5E5A;
+    --text-muted: #898781;
+    --accent-rev: #2a78d6;
+    --accent-cost: #e34948;
+    --accent-be: #eda100;
+    --radius: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181F;
+      --surface: #1E232C;
+      --surface-2: #262B35;
+      --border: #333944;
+      --text-primary: #F2F0EA;
+      --text-secondary: #B4B2A9;
+      --text-muted: #898781;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    padding: 2rem 1rem 4rem;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 14px; color: var(--text-secondary); margin: 0 0 2rem; }
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 1rem; color: var(--text-primary); }
+  .grid-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+  }
+  label { font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+  input[type="number"] {
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+  input[type="number"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(42,120,214,0.4);
+    border-color: var(--accent-rev);
+  }
+  #metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .metric {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+  .metric p.label { font-size: 12px; color: var(--text-secondary); margin: 0 0 4px; }
+  .metric p.value { font-size: 22px; font-weight: 600; margin: 0; }
+  .metric p.sub { font-size: 12px; color: var(--text-muted); margin: 4px 0 0; }
+  .chart-wrap { position: relative; height: 320px; margin-top: 0.5rem; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 0.75rem 0 0; font-size: 12px; color: var(--text-secondary); }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  table { width: 100%; font-size: 13px; border-collapse: collapse; margin-top: 0.75rem; }
+  th { text-align: left; padding: 6px 8px; color: var(--text-secondary); font-weight: 600; border-bottom: 0.5px solid var(--border); }
+  th.num, td.num { text-align: right; }
+  td { padding: 6px 8px; border-bottom: 0.5px solid var(--border); }
+  .footer-note { font-size: 12px; color: var(--text-muted); margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CVP dashboard</h1>
+  <p class="subtitle">Cost-volume-profit model — edit any input below and every figure and chart updates instantly.</p>
+
+  <div class="card">
+    <h2>Inputs</h2>
+    <div class="grid-inputs">
+      <div>
+        <label for="price">Selling price / unit ($)</label>
+        <input type="number" id="price" value="18" step="0.5" />
+      </div>
+      <div>
+        <label for="vc">Variable cost / unit ($)</label>
+        <input type="number" id="vc" value="7" step="0.5" />
+      </div>
+      <div>
+        <label for="fc">Fixed costs, total ($)</label>
+        <input type="number" id="fc" value="42000" step="1000" />
+      </div>
+      <div>
+        <label for="vol">Expected volume (units)</label>
+        <input type="number" id="vol" value="6000" step="100" />
+      </div>
+      <div>
+        <label for="tax">Tax rate (%)</label>
+        <input type="number" id="tax" value="21" step="1" />
+      </div>
+      <div>
+        <label for="target">Target profit ($, after tax)</label>
+        <input type="number" id="target" value="30000" step="1000" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Key metrics</h2>
+    <div id="metrics"></div>
+  </div>
+
+  <div class="card">
+    <h2>CVP chart</h2>
+    <div class="chart-wrap">
+      <canvas id="cvpChart" role="img" aria-label="CVP chart plotting total revenue and total cost lines against unit volume, with the break-even point marked">Chart shows total revenue and total cost lines crossing at the break-even point.</canvas>
+    </div>
+    <div class="legend" id="chartLegend"></div>
+  </div>
+
+  <div class="card">
+    <h2>Sensitivity analysis</h2>
+    <p class="subtitle" style="margin-bottom:0;">How the break-even point shifts with a +/-10% change in price or variable cost, all else held constant.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Price</th>
+          <th>Variable cost</th>
+          <th class="num">Break-even units</th>
+          <th class="num">Break-even sales</th>
+        </tr>
+      </thead>
+      <tbody id="sensBody"></tbody>
+    </table>
+  </div>
+
+  <p class="footer-note">Break-even units = fixed costs / contribution margin per unit. Target profit units = (fixed costs + target profit / (1 - tax rate)) / contribution margin.</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => '$' + Math.round(n).toLocaleString();
+const fmt1 = n => n.toLocaleString(undefined, {maximumFractionDigits: 1});
+
+let chart;
+
+function metricCard(label, value, sub) {
+  return '<div class="metric">' +
+    '<p class="label">' + label + '</p>' +
+    '<p class="value">' + value + '</p>' +
+    (sub ? '<p class="sub">' + sub + '</p>' : '') +
+    '</div>';
+}
+
+function compute() {
+  const price = parseFloat($('price').value) || 0;
+  const vc = parseFloat($('vc').value) || 0;
+  const fc = parseFloat($('fc').value) || 0;
+  const vol = parseFloat($('vol').value) || 0;
+  const taxRate = (parseFloat($('tax').value) || 0) / 100;
+  const target = parseFloat($('target').value) || 0;
+
+  const cm = price - vc;
+  const cmRatio = price > 0 ? cm / price : 0;
+  const beUnits = cm > 0 ? fc / cm : 0;
+  const beSales = beUnits * price;
+  const mosUnits = vol - beUnits;
+  const mosValue = mosUnits * price;
+  const mosPct = vol > 0 ? mosUnits / vol : 0;
+
+  const preTaxTarget = taxRate < 1 ? target / (1 - taxRate) : target;
+  const targetUnits = cm > 0 ? (fc + preTaxTarget) / cm : 0;
+
+  const opIncomeAtVol = cm * vol - fc;
+
+  return {price, vc, fc, vol, taxRate, target, cm, cmRatio, beUnits, beSales, mosUnits, mosValue, mosPct, targetUnits, opIncomeAtVol};
+}
+
+function sensitivityRow(price, vc, fc) {
+  const cm = price - vc;
+  const beUnits = cm > 0 ? fc / cm : 0;
+  return {beUnits, beSales: beUnits * price};
+}
+
+function render() {
+  const m = compute();
+
+  $('metrics').innerHTML =
+    metricCard('Contribution margin', fmt(m.cm) + ' / unit', fmt1(m.cmRatio * 100) + '% of price') +
+    metricCard('Break-even', fmt1(Math.round(m.beUnits)) + ' units', fmt(m.beSales) + ' in sales') +
+    metricCard('Margin of safety', fmt1(Math.round(m.mosUnits)) + ' units', fmt(m.mosValue) + '  ·  ' + fmt1(m.mosPct * 100) + '%') +
+    metricCard('Units for target profit', fmt1(Math.round(m.targetUnits)) + ' units', 'after-tax target ' + fmt(m.target)) +
+    metricCard('Operating income at expected volume', fmt(m.opIncomeAtVol), 'pre-tax, at ' + fmt1(m.vol) + ' units');
+
+  const maxUnits = Math.max(m.beUnits * 2, m.vol * 1.5, 10);
+  const steps = 20;
+  const labels = [];
+  const revenue = [];
+  const cost = [];
+  for (let i = 0; i <= steps; i++) {
+    const x = Math.round((maxUnits / steps) * i);
+    labels.push(x.toLocaleString());
+    revenue.push(x * m.price);
+    cost.push(m.fc + x * m.vc);
+  }
+
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const revColor = '#2a78d6';
+  const costColor = '#e34948';
+  const beColor = '#eda100';
+  const gridColor = isDark ? '#333944' : '#e1e0d9';
+  const tickColor = '#898781';
+
+  if (chart) chart.destroy();
+  chart = new Chart($('cvpChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Total revenue', data: revenue, borderColor: revColor, backgroundColor: revColor, borderWidth: 2, pointRadius: 0, tension: 0 },
+        { label: 'Total cost', data: cost, borderColor: costColor, backgroundColor: costColor, borderWidth: 2, borderDash: [6,3], pointRadius: 0, tension: 0 },
+        { label: 'Break-even', data: labels.map((l, i) => {
+            const x = Math.round((maxUnits / steps) * i);
+            return Math.abs(x - m.beUnits) < (maxUnits/steps) ? m.beSales : null;
+          }), borderColor: beColor, backgroundColor: beColor, pointRadius: 6, pointStyle: 'rectRot', showLine: false }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y)
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Units sold', color: tickColor }, ticks: { color: tickColor, maxTicksLimit: 8 }, grid: { display: false } },
+        y: { title: { display: true, text: 'Dollars', color: tickColor }, ticks: { color: tickColor, callback: v => '$' + (v/1000) + 'k' }, grid: { color: gridColor } }
+      }
+    }
+  });
+
+  $('chartLegend').innerHTML =
+    '<span><span class="dot" style="background:' + revColor + ';"></span>Total revenue</span>' +
+    '<span><span class="dot" style="background:' + costColor + '; border-radius:0; height:2px; margin-top:1px;"></span>Total cost</span>' +
+    '<span><span class="dot" style="background:' + beColor + '; transform:rotate(45deg);"></span>Break-even (' + fmt1(Math.round(m.beUnits)) + ' units)</span>';
+
+  const priceLevels = [{lbl: '-10%', v: m.price * 0.9}, {lbl: 'Base', v: m.price}, {lbl: '+10%', v: m.price * 1.1}];
+  const vcLevels = [{lbl: '-10%', v: m.vc * 0.9}, {lbl: '+10%', v: m.vc * 1.1}];
+
+  let rows = '';
+  priceLevels.forEach(p => {
+    const r = sensitivityRow(p.v, m.vc, m.fc);
+    rows += '<tr><td>Price ' + p.lbl + ' (' + fmt(p.v) + ')</td><td style="color: var(--text-secondary);">Base variable cost</td><td class="num">' + fmt1(Math.round(r.beUnits)) + '</td><td class="num">' + fmt(r.beSales) + '</td></tr>';
+  });
+  vcLevels.forEach(v => {
+    const r = sensitivityRow(m.price, v.v, m.fc);
+    rows += '<tr><td style="color: var(--text-secondary);">Base price</td><td>Variable cost ' + v.lbl + ' (' + fmt(v.v) + ')</td><td class="num">' + fmt1(Math.round(r.beUnits)) + '</td><td class="num">' + fmt(r.beSales) + '</td></tr>';
+  });
+
+  $('sensBody').innerHTML = rows;
+}
+
+['price','vc','fc','vol','tax','target'].forEach(id => $(id).addEventListener('input', render));
+render();
+</script>
+</body>
+</html>
